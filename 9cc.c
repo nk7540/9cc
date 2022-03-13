@@ -15,14 +15,21 @@ struct Token {
   Token *next;
   TokenKind kind;
   char *str;
-  long int val;
+  int val;
 };
 
 Token *token;
 
-void error(char *fmt, ...) {
+char *user_input;
+
+void error_at(char *loc, char *fmt, ...) {
   va_list ap;
   va_start(ap, fmt);
+
+  int pos = loc - user_input;
+  fprintf(stderr, "%s\n", user_input);
+  fprintf(stderr, "%*s", pos, " ");
+  fprintf(stderr, "^ ");
   vfprintf(stderr, fmt, ap);
   fprintf(stderr, "\n");
   exit(1);
@@ -58,7 +65,7 @@ Token *tokenize(char *p) {
       continue;
     }
 
-    error("cannot be tokenized");
+    error_at(p, "cannot be tokenized");
   }
 
   new_token_after(cur, TK_EOF, p);
@@ -74,10 +81,10 @@ void pop_token() {
   token = token->next;
 }
 
-long int pop_number() {
+int pop_number() {
   if (token->kind != TK_NUM)
-    error("number expected, but got something else");
-  long int val = token->val;
+    error_at(token->str, "number expected, but got something else");
+  int val = token->val;
   pop_token();
   return val;
 }
@@ -91,7 +98,7 @@ bool pop_op_if(char op) {
 
 void pop_op(char op) {
   if (token->kind != TK_RESERVED || token->str[0] != op)
-    error("invalid operator: %c", token->str);
+    error_at(token->str, "invalid operator: %c", token->str);
   pop_token();
 }
 
@@ -101,6 +108,8 @@ int main(int argc, char **argv) {
     return 1;
   }
 
+  user_input = argv[1];
+
   printf(".intel_syntax noprefix\n");
   printf(".globl main\n");
   printf("main:\n");
@@ -108,15 +117,15 @@ int main(int argc, char **argv) {
   token = tokenize(argv[1]);
   // "token" is referenced globally below here
 
-  printf("  mov rax, %ld\n", pop_number());
+  printf("  mov rax, %d\n", pop_number());
   while (!at_eof()) {
     if (pop_op_if('+')) {
-      printf("  add rax, %ld\n", pop_number());
+      printf("  add rax, %d\n", pop_number());
       continue;
     }
 
     pop_op('-');
-    printf("  sub rax, %ld\n", pop_number());
+    printf("  sub rax, %d\n", pop_number());
   }
 
   printf("  ret\n");
